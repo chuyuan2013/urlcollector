@@ -28,21 +28,16 @@
 │   └── js/
 │       └── app.js      # 前端JavaScript
 ├── index.html          # 主HTML文件
-├── package.json        # 项目配置
 ├── README.md           # 项目说明
 └── wrangler.toml       # Cloudflare Workers配置
 ```
 
-## 部署步骤
+## 部署步骤（无需本地安装软件）
 
 ### 1. 准备工作
 
 1. 注册Cloudflare账号（免费）
-2. 安装Node.js和npm
-3. 安装Wrangler CLI：
-   ```bash
-   npm install -g wrangler
-   ```
+2. 在GitHub上创建一个新仓库，将本项目代码上传
 
 ### 2. 配置Cloudflare KV命名空间
 
@@ -51,39 +46,42 @@
 3. 创建两个KV命名空间：
    - 名称：USERS（用于存储用户信息）
    - 名称：URLS（用于存储网址数据）
-4. 复制两个命名空间的ID
-5. 更新`wrangler.toml`文件中的`id`和`preview_id`字段
+4. 复制两个命名空间的ID，稍后会用到
 
-### 3. 配置JWT密钥
+### 3. 部署到Cloudflare Pages
 
-1. 在`wrangler.toml`文件中设置`JWT_SECRET`为一个安全的随机字符串
+1. 登录Cloudflare控制台
+2. 进入Workers & Pages > Pages
+3. 点击"Create a project" > "Connect to Git"
+4. 选择您的GitHub仓库
+5. 配置部署设置：
+   - 框架预设：选择"None"
+   - 构建命令：留空
+   - 构建输出目录：留空
+6. 点击"Save and Deploy"
 
-### 4. 部署到Cloudflare Pages
+### 4. 配置KV命名空间绑定
 
-1. 初始化Git仓库：
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   ```
+1. 部署完成后，进入Pages项目的设置页面
+2. 点击"Functions" > "KV namespace bindings"
+3. 添加两个绑定：
+   - 变量名：USERS，选择您创建的USERS命名空间
+   - 变量名：URLS，选择您创建的URLS命名空间
+4. 点击"Save"
 
-2. 登录Wrangler：
-   ```bash
-   wrangler login
-   ```
+### 5. 配置环境变量
 
-3. 部署到Cloudflare Pages：
-   ```bash
-   wrangler pages deploy .
-   ```
+1. 在Pages项目设置页面，点击"Environment variables"
+2. 添加以下环境变量：
+   - 变量名：JWT_SECRET，值：设置一个安全的随机字符串
+3. 点击"Save"
 
-4. 在Cloudflare控制台中配置Pages项目：
-   - 进入Workers & Pages > Pages
-   - 选择部署的项目
-   - 进入Settings > Functions
-   - 确保KV命名空间绑定正确
+### 6. 重新部署
 
-### 5. 测试访问
+1. 在Pages项目页面，点击"Deployments"
+2. 点击"Deploy site"按钮，重新部署项目
+
+### 7. 测试访问
 
 部署完成后，Cloudflare会提供一个域名，通过该域名访问网站。
 

@@ -3,7 +3,7 @@ import { createHmac } from 'crypto';
 
 // 生成JWT令牌
 function generateToken(userId) {
-  const secret = ENV.JWT_SECRET || 'default-secret-key';
+  const secret = JWT_SECRET || 'default-secret-key';
   const payload = {
     sub: userId,
     exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7天过期
@@ -24,7 +24,7 @@ function generateToken(userId) {
 // 验证JWT令牌
 function verifyToken(token) {
   try {
-    const secret = ENV.JWT_SECRET || 'default-secret-key';
+    const secret = JWT_SECRET || 'default-secret-key';
     const [header, payload, signature] = token.split('.');
     const expectedSignature = createHmac('sha256', secret)
       .update(`${header}.${payload}`)
@@ -50,7 +50,7 @@ function verifyToken(token) {
 
 // 哈希密码
 function hashPassword(password) {
-  const secret = ENV.JWT_SECRET || 'default-secret-key';
+  const secret = JWT_SECRET || 'default-secret-key';
   return createHmac('sha256', secret)
     .update(password)
     .digest('hex');
