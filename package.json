@@ -1,0 +1,17 @@
+{
+  "name": "urlcollector",
+  "version": "1.0.0",
+  "description": "个人网址收藏网站",
+  "main": "functions/api.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "devDependencies": {},
+  "keywords": ["url", "collection", "cloudflare"],
+  "author": "",
+  "license": "MIT"
+}
