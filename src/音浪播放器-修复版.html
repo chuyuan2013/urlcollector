@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌊 音浪播放器 - 修复版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #0a0a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        #canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        .upload-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .upload-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0.8);
+        }
+
+        .upload-area {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 50px 60px;
+            text-align: center;
+            border: 3px dashed rgba(100, 200, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .upload-area.dragover {
+            border-color: #00c8ff;
+            background: rgba(0, 200, 255, 0.15);
+            transform: scale(1.02);
+        }
+
+        .upload-area h2 {
+            color: #00c8ff;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 300;
+        }
+
+        .upload-area p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #00c8ff 0%, #0080ff 100%);
+            color: #fff;
+            border: none;
+            padding: 14px 35px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 200, 255, 0.4);
+        }
+
+        .player-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .player-container.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .player {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 50px;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #00c8ff 0%, #0080ff 100%);
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0, 200, 255, 0.5);
+        }
+
+        .song-info {
+            color: #fff;
+            font-size: 14px;
+            min-width: 150px;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .time-display {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            min-width: 45px;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00c8ff, #0080ff);
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 3px;
+        }
+
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-icon {
+            color: #fff;
+            font-size: 18px;
+        }
+
+        .volume-slider {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00c8ff;
+            cursor: pointer;
+        }
+
+        .debug-info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 10px;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 300;
+            max-width: 250px;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .audio-viz {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 300;
+            border: 1px solid rgba(0, 200, 255, 0.3);
+        }
+
+        .audio-viz h3 {
+            color: #00c8ff;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .freq-bar {
+            display: flex;
+            align-items: flex-end;
+            height: 60px;
+            gap: 3px;
+            margin-bottom: 10px;
+        }
+
+        .freq-segment {
+            flex: 1;
+            background: linear-gradient(to top, #00c8ff, #0080ff);
+            border-radius: 2px;
+            transition: height 0.05s ease;
+            min-height: 2px;
+        }
+
+        .freq-segment.bass {
+            background: linear-gradient(to top, #ff6b6b, #ee5a24);
+        }
+
+        .freq-segment.mid {
+            background: linear-gradient(to top, #feca57, #ff9f43);
+        }
+
+        .freq-segment.high {
+            background: linear-gradient(to top, #48dbfb, #0abde3);
+        }
+
+        .audio-stats {
+            color: #fff;
+            font-size: 10px;
+            font-family: monospace;
+        }
+
+        .audio-stats div {
+            margin: 3px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .audio-stats span {
+            color: #00c8ff;
+        }
+
+        .error-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 71, 87, 0.9);
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            z-index: 400;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            max-width: 80%;
+            text-align: center;
+        }
+
+        .error-message.show {
+            opacity: 1;
+        }
+
+        .loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 200, 255, 0.9);
+            padding: 20px 40px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 16px;
+            z-index: 300;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-indicator.show {
+            opacity: 1;
+        }
+
+        .aspect-control {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .aspect-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+        }
+
+        .aspect-btn {
+            padding: 6px 14px;
+            border: 1px solid rgba(100, 200, 255, 0.3);
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .aspect-btn:hover {
+            background: rgba(0, 200, 255, 0.1);
+            border-color: rgba(0, 200, 255, 0.5);
+        }
+
+        .aspect-btn.active {
+            background: linear-gradient(135deg, #00c8ff 0%, #0080ff 100%);
+            border-color: transparent;
+            color: #fff;
+        }
+
+        .play-area-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .play-area {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .play-area.ratio-16-9 {
+            width: 100%;
+            height: 100%;
+            max-width: 100vw;
+            max-height: 56.25vw;
+        }
+
+        .play-area.ratio-9-16 {
+            width: 100%;
+            height: 100%;
+            max-height: 100vh;
+            max-width: 56.25vh;
+        }
+
+        .play-area-border {
+            position: absolute;
+            border: 2px solid rgba(0, 200, 255, 0.2);
+            border-radius: 12px;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body>
+    <div class="aspect-control">
+        <span class="aspect-label">🎬 宽高比:</span>
+        <button class="aspect-btn active" id="aspect169" data-ratio="16-9">16:9</button>
+        <button class="aspect-btn" id="aspect916" data-ratio="9-16">9:16</button>
+    </div>
+
+    <div class="play-area-container">
+        <div class="play-area ratio-16-9" id="playArea">
+            <div class="play-area-border" id="playAreaBorder"></div>
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+
+    <div class="debug-info" id="debugInfo">
+        <div>状态: 等待上传</div>
+        <div>音频上下文: 未初始化</div>
+        <div>音量: 70%</div>
+    </div>
+
+    <div class="audio-viz" id="audioViz">
+        <h3>🎵 音频分析</h3>
+        <div class="freq-bar" id="freqBar">
+            <div class="freq-segment bass" style="height: 2px;"></div>
+            <div class="freq-segment bass" style="height: 2px;"></div>
+            <div class="freq-segment bass" style="height: 2px;"></div>
+            <div class="freq-segment mid" style="height: 2px;"></div>
+            <div class="freq-segment mid" style="height: 2px;"></div>
+            <div class="freq-segment mid" style="height: 2px;"></div>
+            <div class="freq-segment high" style="height: 2px;"></div>
+            <div class="freq-segment high" style="height: 2px;"></div>
+            <div class="freq-segment high" style="height: 2px;"></div>
+        </div>
+        <div class="audio-stats">
+            <div>低频(鼓点): <span id="bassVal">0%</span></div>
+            <div>中频(人声): <span id="midVal">0%</span></div>
+            <div>高频(镲片): <span id="highVal">0%</span></div>
+            <div>平均音量: <span id="avgVal">0%</span></div>
+            <div>节拍强度: <span id="beatVal">0%</span></div>
+        </div>
+    </div>
+
+    <div class="loading-indicator" id="loadingIndicator">⏳ 加载中...</div>
+    <div class="error-message" id="errorMessage"></div>
+
+    <div class="upload-container" id="uploadContainer">
+        <div class="upload-area" id="uploadArea">
+            <h2>🌊 音浪播放器 - 修复版</h2>
+            <p>拖拽音频文件到这里或点击选择<br>支持 MP3, WAV, OGG, FLAC 格式</p>
+            <button class="upload-btn" id="uploadBtn">选择音乐</button>
+            <input type="file" id="fileInput" accept="audio/*" style="display: none;">
+        </div>
+    </div>
+
+    <div class="player-container" id="playerContainer">
+        <div class="player">
+            <button class="control-btn" id="playBtn">▶</button>
+            <div class="song-info" id="songInfo">未选择音乐</div>
+            <div class="progress-container">
+                <span class="time-display" id="currentTime">0:00</span>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="time-display" id="duration">0:00</span>
+            </div>
+            <div class="volume-container">
+                <span class="volume-icon">🔊</span>
+                <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.7">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let leftCenter, rightCenter;
+        let time = 0;
+
+        let audioContext, analyser, gainNode, source;
+        let audioElement;
+        let isPlaying = false;
+        let frequencyData;
+        let audioAverage = 0;
+        let audioBass = 0;
+        let audioMid = 0;
+        let audioHigh = 0;
+        let beatDetected = false;
+        let lastBeatTime = 0;
+        let beatIntensity = 0;
+        let currentRatio = '16-9';
+
+        let config = {
+            waveCount: 12,
+            waveSpeed: 1.0,
+            waveAmplitude: 1.0,
+            waveResponse: 1.0,
+            waveAlpha: 0.6,
+            leftHue: 200,
+            rightHue: 280,
+            saturation: 100
+        };
+
+        function updateDebug(info) {
+            document.getElementById('debugInfo').innerHTML = info;
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+            }, 5000);
+        }
+
+        function resize() {
+            const playArea = document.getElementById('playArea');
+            const rect = playArea.getBoundingClientRect();
+            
+            width = rect.width;
+            height = rect.height;
+            canvas.width = width;
+            canvas.height = height;
+            
+            leftCenter = { x: width * 0.25, y: height * 0.5 };
+            rightCenter = { x: width * 0.75, y: height * 0.5 };
+
+            const border = document.getElementById('playAreaBorder');
+            border.style.width = '100%';
+            border.style.height = '100%';
+        }
+
+        function switchAspectRatio(ratio) {
+            if (currentRatio === ratio) return;
+
+            currentRatio = ratio;
+            const playArea = document.getElementById('playArea');
+            
+            playArea.classList.remove('ratio-16-9', 'ratio-9-16');
+            playArea.classList.add(`ratio-${ratio}`);
+
+            document.querySelectorAll('.aspect-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.ratio === ratio);
+            });
+
+            setTimeout(() => {
+                resize();
+            }, 50);
+        }
+
+        function drawBackground() {
+            const bgGradient = ctx.createLinearGradient(0, 0, width, 0);
+            bgGradient.addColorStop(0, '#0a0a20');
+            bgGradient.addColorStop(0.5, '#0f0f2a');
+            bgGradient.addColorStop(1, '#0a0a20');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, width, height);
+
+            for (let i = 0; i < 100; i++) {
+                const x = (Math.sin(i * 1.234 + time * 0.003) * 0.5 + 0.5) * width;
+                const y = (Math.cos(i * 2.345 + time * 0.002) * 0.5 + 0.5) * height;
+                const size = 0.5 + Math.sin(time * 0.015 + i) * 0.3;
+                const alpha = 0.3 + Math.sin(time * 0.01 + i * 0.5) * 0.2;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(150, 180, 255, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function drawCircularWaves(center, hue, offset) {
+            const waveCount = config.waveCount;
+            const maxDistance = Math.max(width, height) * 1.2;
+            
+            // 综合音乐响应系数
+            const totalResponse = (audioAverage + audioBass * 2 + audioMid * 0.5) / 3.5;
+            const musicMultiplier = 1 + totalResponse * config.waveResponse * 2;
+            const bassMultiplier = 1 + audioBass * config.waveResponse * 1.5;
+            const beatMultiplier = 1 + beatIntensity * 0.5;
+            
+            for (let i = 0; i < waveCount; i++) {
+                const waveProgress = i / waveCount;
+                const waveOffset = (time * config.waveSpeed * 2 + offset + i * 40) % maxDistance;
+                
+                const baseRadius = waveOffset * (0.8 + audioAverage * 0.4);
+                
+                // 动态波浪幅度，响应不同频段
+                const waveAmplitude = 25 * config.waveAmplitude * musicMultiplier * bassMultiplier * beatMultiplier;
+                
+                // 动态透明度，响应节拍
+                const beatAlpha = beatIntensity * 0.3;
+                const alpha = (config.waveAlpha + beatAlpha) * (1 - Math.pow(waveProgress, 1.5));
+                
+                if (alpha <= 0.01) continue;
+
+                const points = [];
+                const segmentCount = 120;
+                
+                for (let j = 0; j <= segmentCount; j++) {
+                    const angle = (j / segmentCount) * Math.PI * 2;
+                    
+                    // 多层波浪叠加
+                    const wavePhase1 = angle * 3 + time * 0.03 * config.waveSpeed + i * 0.3;
+                    const wavePhase2 = angle * 5 + time * 0.05 * config.waveSpeed + i * 0.5;
+                    const wavePhase3 = angle * 2 + time * 0.02 * config.waveSpeed + i * 0.2;
+                    
+                    // 基础波浪
+                    const wave1 = Math.sin(wavePhase1) * waveAmplitude * 0.4;
+                    const wave2 = Math.sin(wavePhase2) * waveAmplitude * 0.25;
+                    const wave3 = Math.sin(wavePhase3) * waveAmplitude * 0.15;
+                    
+                    // 音频响应调制
+                    const bassMod = audioBass * Math.sin(angle * 4 + time * 0.05) * waveAmplitude * 0.6;
+                    const midMod = audioMid * Math.sin(angle * 8 + time * 0.08) * waveAmplitude * 0.3;
+                    const highMod = audioHigh * Math.sin(angle * 12 + time * 0.1) * waveAmplitude * 0.15;
+                    
+                    // 节拍响应
+                    const beatMod = beatIntensity * Math.sin(angle * 6) * 20;
+                    
+                    const distance = baseRadius + wave1 + wave2 + wave3 + bassMod + midMod + highMod + beatMod;
+                    
+                    const x = center.x + Math.cos(angle) * distance;
+                    const y = center.y + Math.sin(angle) * distance;
+                    
+                    points.push({ x, y });
+                }
+
+                // 绘制波浪线
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                
+                for (let j = 1; j < points.length; j++) {
+                    ctx.lineTo(points[j].x, points[j].y);
+                }
+                
+                ctx.closePath();
+                
+                // 动态颜色，响应音频
+                const hueShift = audioBass * 30 + audioMid * 15;
+                const waveHue = (hue + i * 4 + hueShift) % 360;
+                const lightness = 50 + i * 2 + audioAverage * 20;
+                const saturation = config.saturation + audioBass * 20;
+                
+                ctx.strokeStyle = `hsla(${waveHue}, ${Math.min(saturation, 100)}%, ${lightness}%, ${alpha})`;
+                ctx.lineWidth = 3 + (1 - waveProgress) * 5 + audioBass * 3;
+                ctx.stroke();
+                
+                // 填充发光效果
+                if (i < 5) {
+                    const innerRadius = Math.max(0, baseRadius - 15);
+                    const outerRadius = Math.max(innerRadius + 1, baseRadius + 60);
+                    const gradient = ctx.createRadialGradient(
+                        center.x, center.y, innerRadius,
+                        center.x, center.y, outerRadius
+                    );
+                    gradient.addColorStop(0, `hsla(${waveHue}, ${saturation}%, 60%, 0)`);
+                    gradient.addColorStop(0.3, `hsla(${waveHue}, ${saturation}%, 55%, ${alpha * 0.4})`);
+                    gradient.addColorStop(0.7, `hsla(${waveHue}, ${saturation}%, 50%, ${alpha * 0.2})`);
+                    gradient.addColorStop(1, `hsla(${waveHue}, ${saturation}%, 45%, 0)`);
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                }
+            }
+            
+            // 绘制中心发光点
+            const centerGlowRadius = Math.max(0, 8 + audioBass * 25 + beatIntensity * 15);
+            if (centerGlowRadius > 0) {
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, centerGlowRadius, 0, Math.PI * 2);
+                const centerGlow = ctx.createRadialGradient(
+                    center.x, center.y, 0,
+                    center.x, center.y, Math.max(1, centerGlowRadius * 2)
+                );
+                centerGlow.addColorStop(0, `hsla(${hue}, ${config.saturation}%, 70%, ${0.9 + audioBass * 0.1})`);
+                centerGlow.addColorStop(0.3, `hsla(${hue}, ${config.saturation}%, 60%, ${0.5 + audioAverage * 0.2})`);
+                centerGlow.addColorStop(0.6, `hsla(${hue}, ${config.saturation}%, 50%, ${0.2 + beatIntensity * 0.3})`);
+                centerGlow.addColorStop(1, `hsla(${hue}, ${config.saturation}%, 50%, 0)`);
+                ctx.fillStyle = centerGlow;
+                ctx.fill();
+            }
+        }
+
+        function drawWaves() {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, width, height);
+            ctx.clip();
+            
+            drawCircularWaves(leftCenter, config.leftHue, 0);
+            drawCircularWaves(rightCenter, config.rightHue, 100);
+            
+            ctx.restore();
+        }
+
+        function analyzeAudio() {
+            if (!isPlaying || !analyser || !frequencyData) {
+                console.log('⚠️ 音频分析跳过 - 状态:', { isPlaying, hasAnalyser: !!analyser, hasData: !!frequencyData });
+                return;
+            }
+
+            try {
+                analyser.getByteFrequencyData(frequencyData);
+
+                // 检查是否有音频数据
+                let hasData = false;
+                let sum = 0;
+                for (let i = 0; i < frequencyData.length; i++) {
+                    sum += frequencyData[i];
+                    if (frequencyData[i] > 0) hasData = true;
+                }
+
+                if (!hasData) {
+                    console.log('⚠️ 频谱数据全为0');
+                    return;
+                }
+
+                // 计算整体平均音量
+                const newAverage = sum / (frequencyData.length * 255);
+                // 平滑过渡
+                audioAverage = audioAverage * 0.7 + newAverage * 0.3;
+
+                // 低频分析 (20-250Hz) - 鼓点、贝斯
+                const bassEnd = Math.floor(frequencyData.length * 0.1);
+                let bassSum = 0;
+                for (let i = 0; i < bassEnd; i++) {
+                    bassSum += frequencyData[i];
+                }
+                const newBass = bassSum / (bassEnd * 255);
+                audioBass = audioBass * 0.6 + newBass * 0.4;
+
+                // 中频分析 (250Hz-2kHz) - 人声、乐器
+                const midStart = bassEnd;
+                const midEnd = Math.floor(frequencyData.length * 0.5);
+                let midSum = 0;
+                for (let i = midStart; i < midEnd; i++) {
+                    midSum += frequencyData[i];
+                }
+                const newMid = midSum / ((midEnd - midStart) * 255);
+                audioMid = audioMid * 0.7 + newMid * 0.3;
+
+                // 高频分析 (2kHz-20kHz) - 镲片、高音
+                const highStart = midEnd;
+                let highSum = 0;
+                for (let i = highStart; i < frequencyData.length; i++) {
+                    highSum += frequencyData[i];
+                }
+                const newHigh = highSum / ((frequencyData.length - highStart) * 255);
+                audioHigh = audioHigh * 0.8 + newHigh * 0.2;
+
+                // 节拍检测
+                const now = Date.now();
+                const bassThreshold = 0.25;
+                const minBeatInterval = 200;
+                
+                if (newBass > bassThreshold && newBass > audioBass * 0.9) {
+                    if (now - lastBeatTime > minBeatInterval) {
+                        beatDetected = true;
+                        lastBeatTime = now;
+                        beatIntensity = Math.min(newBass * 2, 1);
+                        console.log('🥁 检测到节拍! 强度:', beatIntensity.toFixed(2));
+                    }
+                } else {
+                    beatDetected = false;
+                }
+
+                // 节拍强度衰减
+                beatIntensity *= 0.92;
+
+                // 每60帧输出一次调试信息
+                if (time % 60 === 0) {
+                    console.log('🎵 音频数据:', {
+                        avg: audioAverage.toFixed(3),
+                        bass: audioBass.toFixed(3),
+                        mid: audioMid.toFixed(3),
+                        high: audioHigh.toFixed(3),
+                        beat: beatIntensity.toFixed(3)
+                    });
+                }
+            } catch (e) {
+                console.error('❌ 音频分析错误:', e);
+            }
+        }
+
+        function updateAudioViz() {
+            // 更新频谱条
+            const segments = document.querySelectorAll('.freq-segment');
+            if (segments.length >= 9) {
+                segments[0].style.height = Math.max(2, audioBass * 60) + 'px';
+                segments[1].style.height = Math.max(2, audioBass * 50) + 'px';
+                segments[2].style.height = Math.max(2, audioBass * 40 + audioMid * 20) + 'px';
+                segments[3].style.height = Math.max(2, audioMid * 50) + 'px';
+                segments[4].style.height = Math.max(2, audioMid * 40) + 'px';
+                segments[5].style.height = Math.max(2, audioMid * 30 + audioHigh * 10) + 'px';
+                segments[6].style.height = Math.max(2, audioHigh * 50) + 'px';
+                segments[7].style.height = Math.max(2, audioHigh * 40) + 'px';
+                segments[8].style.height = Math.max(2, audioHigh * 30) + 'px';
+            }
+
+            // 更新数值显示
+            document.getElementById('bassVal').textContent = Math.round(audioBass * 100) + '%';
+            document.getElementById('midVal').textContent = Math.round(audioMid * 100) + '%';
+            document.getElementById('highVal').textContent = Math.round(audioHigh * 100) + '%';
+            document.getElementById('avgVal').textContent = Math.round(audioAverage * 100) + '%';
+            document.getElementById('beatVal').textContent = Math.round(beatIntensity * 100) + '%';
+        }
+
+        function animate() {
+            time++;
+
+            analyzeAudio();
+            updateAudioViz();
+
+            // 非播放状态时音频值衰减
+            if (!isPlaying) {
+                audioAverage *= 0.95;
+                audioBass *= 0.95;
+                audioMid *= 0.95;
+                audioHigh *= 0.95;
+                beatIntensity *= 0.9;
+            }
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(10, 10, 26, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            drawBackground();
+            drawWaves();
+            ctx.restore();
+
+            requestAnimationFrame(animate);
+        }
+
+        function initAudio() {
+            if (!audioContext) {
+                console.log('🔊 初始化音频上下文...');
+                updateDebug(`<div>状态: 初始化音频...</div><div>音频上下文: 创建中...</div><div>音量: 70%</div>`);
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 512;
+                    gainNode = audioContext.createGain();
+                    gainNode.gain.value = 0.7;
+
+                    const bufferLength = analyser.frequencyBinCount;
+                    frequencyData = new Uint8Array(bufferLength);
+                    console.log('✅ 音频上下文初始化成功');
+                    updateDebug(`<div>状态: 音频上下文就绪</div><div>音频上下文: 已创建</div><div>音量: 70%</div>`);
+                } catch (e) {
+                    console.error('❌ 音频上下文初始化失败:', e);
+                    showError('您的浏览器不支持Web Audio API，请使用现代浏览器');
+                    updateDebug(`<div>状态: 音频上下文失败</div><div>音频上下文: 失败</div><div>错误: ${e.message}</div>`);
+                }
+            }
+        }
+
+        function loadAudio(file) {
+            console.log('📁 加载音频文件:', file.name);
+            updateDebug(`<div>状态: 加载文件...</div><div>文件: ${file.name}</div><div>音量: 70%</div>`);
+
+            const validTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/mp3'];
+            const validExtensions = ['.mp3', '.wav', '.ogg', '.flac'];
+            const fileName = file.name.toLowerCase();
+            const isValid = validTypes.includes(file.type) || 
+                           validExtensions.some(ext => fileName.endsWith(ext));
+            
+            if (!isValid) {
+                showError('不支持的文件格式，请使用 MP3、WAV、OGG 或 FLAC 格式');
+                return;
+            }
+
+            document.getElementById('loadingIndicator').classList.add('show');
+            
+            initAudio();
+
+            if (audioElement) {
+                console.log('🔄 清理旧音频...');
+                audioElement.pause();
+                audioElement.src = '';
+                // 清理旧的source连接
+                if (source) {
+                    try {
+                        source.disconnect();
+                        console.log('✅ 已断开旧source连接');
+                    } catch (e) {
+                        console.log('⚠️ 断开旧source失败:', e);
+                    }
+                    source = null;
+                }
+            }
+
+            audioElement = new Audio();
+            const objectURL = URL.createObjectURL(file);
+            audioElement.src = objectURL;
+            audioElement.volume = 1;
+            audioElement.preload = 'auto';
+
+            console.log('🔗 设置音频源:', objectURL);
+            updateDebug(`<div>状态: 等待元数据...</div><div>文件: ${file.name}</div><div>音量: 70%</div>`);
+
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log('✅ 音频元数据加载成功');
+                document.getElementById('loadingIndicator').classList.remove('show');
+                document.getElementById('duration').textContent = formatTime(audioElement.duration);
+                document.getElementById('songInfo').textContent = file.name;
+                document.getElementById('uploadContainer').classList.add('hidden');
+                document.getElementById('playerContainer').classList.add('show');
+                updateDebug(`<div>状态: 准备播放</div><div>文件: ${file.name}</div><div>时长: ${formatTime(audioElement.duration)}</div><div>音量: 70%</div>`);
+                playAudio();
+            });
+
+            audioElement.addEventListener('error', (e) => {
+                console.error('❌ 音频加载错误:', e, audioElement.error);
+                document.getElementById('loadingIndicator').classList.remove('show');
+                const errorCode = audioElement.error ? audioElement.error.code : 'unknown';
+                showError(`音频文件加载失败 (错误码: ${errorCode})，请尝试其他文件`);
+                updateDebug(`<div>状态: 加载失败</div><div>错误码: ${errorCode}</div><div>文件: ${file.name}</div>`);
+            });
+
+            audioElement.addEventListener('timeupdate', () => {
+                document.getElementById('currentTime').textContent = formatTime(audioElement.currentTime);
+                const progress = (audioElement.currentTime / audioElement.duration) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+            });
+
+            audioElement.addEventListener('ended', () => {
+                console.log('🔄 音频播放结束，循环播放');
+                audioElement.currentTime = 0;
+                audioElement.play();
+            });
+
+            audioElement.addEventListener('play', () => {
+                console.log('▶️ 音频开始播放');
+                isPlaying = true;
+                document.getElementById('playBtn').textContent = '⏸';
+                updateDebug(`<div>状态: 播放中</div><div>文件: ${file.name}</div><div>音量: ${Math.round(audioElement.volume * 100)}%</div>`);
+            });
+
+            audioElement.addEventListener('pause', () => {
+                console.log('⏸️ 音频已暂停');
+                isPlaying = false;
+                document.getElementById('playBtn').textContent = '▶';
+                updateDebug(`<div>状态: 已暂停</div><div>文件: ${file.name}</div><div>音量: ${Math.round(audioElement.volume * 100)}%</div>`);
+            });
+        }
+
+        function playAudio() {
+            if (!audioElement) {
+                console.error('❌ 没有音频元素');
+                return;
+            }
+
+            console.log('▶️ 尝试播放音频...');
+
+            if (audioContext.state === 'suspended') {
+                console.log('🔄 恢复音频上下文...');
+                audioContext.resume().then(() => {
+                    console.log('✅ 音频上下文已恢复');
+                }).catch((e) => {
+                    console.error('❌ 恢复音频上下文失败:', e);
+                });
+            }
+
+            // 只在第一次播放时创建连接
+            if (!source) {
+                try {
+                    console.log('🔗 创建音频连接...');
+                    source = audioContext.createMediaElementSource(audioElement);
+                    source.connect(gainNode);
+                    gainNode.connect(analyser);
+                    analyser.connect(audioContext.destination);
+                    console.log('✅ 音频连接成功');
+                    console.log('📊 连接链: audioElement -> source -> gainNode -> analyser -> destination');
+                } catch (e) {
+                    console.error('❌ 音频连接错误:', e);
+                    showError('音频连接失败: ' + e.message);
+                    return;
+                }
+            } else {
+                console.log('✅ 使用已有音频连接');
+            }
+
+            console.log('🎵 调用 audioElement.play()');
+            const playPromise = audioElement.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('✅ 音频播放成功!');
+                    isPlaying = true;
+                    document.getElementById('playBtn').textContent = '⏸';
+                    updateDebug(`<div>状态: 播放中 (有声音)</div><div>音量: ${Math.round(audioElement.volume * 100)}%</div>`);
+                }).catch((error) => {
+                    console.error('❌ 音频播放失败:', error);
+                    showError('音频播放失败，请检查浏览器权限设置或点击页面后重试');
+                    updateDebug(`<div>状态: 播放失败</div><div>错误: ${error.name}</div><div>请点击页面重试</div>`);
+                });
+            } else {
+                console.log('⚠️ 浏览器不支持play() Promise');
+                isPlaying = true;
+                document.getElementById('playBtn').textContent = '⏸';
+            }
+        }
+
+        function togglePlay() {
+            if (!audioElement) {
+                console.error('❌ 没有音频元素');
+                return;
+            }
+
+            if (isPlaying) {
+                console.log('⏸️ 暂停音频');
+                audioElement.pause();
+                isPlaying = false;
+                document.getElementById('playBtn').textContent = '▶';
+            } else {
+                console.log('▶️ 继续播放音频');
+                playAudio();
+            }
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadBtn.addEventListener('click', () => {
+            console.log('🖱️ 点击上传按钮');
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                console.log('📁 文件选择:', e.target.files[0].name);
+                loadAudio(e.target.files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                console.log('📁 文件拖拽:', e.dataTransfer.files[0].name);
+                loadAudio(e.dataTransfer.files[0]);
+            }
+        });
+
+        document.getElementById('playBtn').addEventListener('click', togglePlay);
+
+        document.getElementById('volumeSlider').addEventListener('input', (e) => {
+            const volume = parseFloat(e.target.value);
+            console.log('🔊 设置音量为:', volume);
+            if (audioElement) {
+                audioElement.volume = volume;
+            }
+            if (gainNode) {
+                gainNode.gain.value = volume;
+            }
+            updateDebug(`<div>状态: ${isPlaying ? '播放中 (有声音)' : '已暂停'}</div><div>音量: ${Math.round(volume * 100)}%</div>`);
+        });
+
+        document.getElementById('progressBar').addEventListener('click', (e) => {
+            if (!audioElement) return;
+            const rect = e.target.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            audioElement.currentTime = percent * audioElement.duration;
+        });
+
+        document.addEventListener('click', () => {
+            if (audioContext && audioContext.state === 'suspended') {
+                console.log('🖱️ 点击恢复音频上下文');
+                audioContext.resume();
+            }
+        });
+
+        window.addEventListener('resize', resize);
+
+        document.getElementById('aspect169').addEventListener('click', () => {
+            switchAspectRatio('16-9');
+        });
+
+        document.getElementById('aspect916').addEventListener('click', () => {
+            switchAspectRatio('9-16');
+        });
+
+        console.log('🌊 音浪播放器启动中...');
+        updateDebug(`<div>状态: 等待上传</div><div>音频上下文: 未初始化</div><div>音量: 70%</div>`);
+        resize();
+        animate();
+    </script>
+</body>
+</html>
