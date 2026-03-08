@@ -583,117 +583,125 @@
             }
         }
 
-        function drawCircularWaves(center, hue, offset) {
-            const waveCount = config.waveCount;
-            const maxDistance = Math.max(width, height) * 1.2;
+        function drawKaleidoscopeFlowers() {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const maxRadius = Math.min(width, height) / 2 * 0.9;
             
-            // 综合音乐响应系数
             const totalResponse = (audioAverage + audioBass * 2 + audioMid * 0.5) / 3.5;
-            const musicMultiplier = 1 + totalResponse * config.waveResponse * 2;
-            const bassMultiplier = 1 + audioBass * config.waveResponse * 1.5;
+            const musicMultiplier = 1 + totalResponse * 2;
+            const bassMultiplier = 1 + audioBass * 1.5;
             const beatMultiplier = 1 + beatIntensity * 0.5;
             
-            for (let i = 0; i < waveCount; i++) {
-                const waveProgress = i / waveCount;
-                const waveOffset = (time * config.waveSpeed * 2 + offset + i * 40) % maxDistance;
+            const segments = 6;
+            const angleStep = (Math.PI * 2) / segments;
+            
+            for (let seg = 0; seg < segments; seg++) {
+                const baseAngle = seg * angleStep;
                 
-                const baseRadius = waveOffset * (0.8 + audioAverage * 0.4);
-                
-                // 动态波浪幅度，响应不同频段
-                const waveAmplitude = 25 * config.waveAmplitude * musicMultiplier * bassMultiplier * beatMultiplier;
-                
-                // 动态透明度，响应节拍
-                const beatAlpha = beatIntensity * 0.3;
-                const alpha = (config.waveAlpha + beatAlpha) * (1 - Math.pow(waveProgress, 1.5));
-                
-                if (alpha <= 0.01) continue;
-
-                const points = [];
-                const segmentCount = 120;
-                
-                for (let j = 0; j <= segmentCount; j++) {
-                    const angle = (j / segmentCount) * Math.PI * 2;
+                for (let flower = 0; flower < 12; flower++) {
+                    const flowerProgress = flower / 12;
+                    const flowerDistance = maxRadius * flowerProgress * 0.9;
+                    const flowerSize = (15 + audioAverage * 20) * musicMultiplier * bassMultiplier * beatMultiplier;
+                    const petalCount = 5 + Math.floor(audioMid * 5);
                     
-                    // 多层波浪叠加
-                    const wavePhase1 = angle * 3 + time * 0.03 * config.waveSpeed + i * 0.3;
-                    const wavePhase2 = angle * 5 + time * 0.05 * config.waveSpeed + i * 0.5;
-                    const wavePhase3 = angle * 2 + time * 0.02 * config.waveSpeed + i * 0.2;
+                    const flowerAngle = baseAngle + time * 0.002 + flower * 0.5;
+                    const petalPhase = time * 0.01 + flower * 0.2;
                     
-                    // 基础波浪
-                    const wave1 = Math.sin(wavePhase1) * waveAmplitude * 0.4;
-                    const wave2 = Math.sin(wavePhase2) * waveAmplitude * 0.25;
-                    const wave3 = Math.sin(wavePhase3) * waveAmplitude * 0.15;
+                    const flowerX = centerX + Math.cos(flowerAngle) * flowerDistance;
+                    const flowerY = centerY + Math.sin(flowerAngle) * flowerDistance;
                     
-                    // 音频响应调制
-                    const bassMod = audioBass * Math.sin(angle * 4 + time * 0.05) * waveAmplitude * 0.6;
-                    const midMod = audioMid * Math.sin(angle * 8 + time * 0.08) * waveAmplitude * 0.3;
-                    const highMod = audioHigh * Math.sin(angle * 12 + time * 0.1) * waveAmplitude * 0.15;
+                    const alpha = (0.7 + beatIntensity * 0.2) * (1 - flowerProgress * 0.7);
                     
-                    // 节拍响应
-                    const beatMod = beatIntensity * Math.sin(angle * 6) * 20;
+                    for (let petal = 0; petal < petalCount; petal++) {
+                        const petalAngle = (petal / petalCount) * Math.PI * 2;
+                        const petalCurve = Math.sin(petalPhase + petal * 0.5) * flowerSize * 0.3;
+                        
+                        ctx.beginPath();
+                        
+                        for (let i = 0; i <= 30; i++) {
+                            const t = i / 30;
+                            const curveAngle = petalAngle + Math.sin(t * Math.PI) * 0.5;
+                            const curveRadius = Math.sin(t * Math.PI) * (flowerSize + petalCurve);
+                            
+                            const x = flowerX + Math.cos(curveAngle) * curveRadius;
+                            const y = flowerY + Math.sin(curveAngle) * curveRadius;
+                            
+                            if (i === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        
+                        ctx.closePath();
+                        
+                        const hue = (seg * 60 + flower * 15 + audioBass * 30) % 360;
+                        const saturation = 80 + audioBass * 20;
+                        const lightness = 50 + audioAverage * 20;
+                        
+                        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha * 0.6})`;
+                        ctx.fill();
+                        
+                        ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness + 10}%, ${alpha})`;
+                        ctx.lineWidth = 1 + (1 - flowerProgress) * 2;
+                        ctx.stroke();
+                    }
                     
-                    const distance = baseRadius + wave1 + wave2 + wave3 + bassMod + midMod + highMod + beatMod;
+                    const centerHue = (seg * 60 + flower * 15 + 60) % 360;
+                    const centerSize = flowerSize * 0.25 * (1 + beatIntensity * 0.3);
                     
-                    const x = center.x + Math.cos(angle) * distance;
-                    const y = center.y + Math.sin(angle) * distance;
-                    
-                    points.push({ x, y });
-                }
-
-                // 绘制波浪线
-                ctx.beginPath();
-                ctx.moveTo(points[0].x, points[0].y);
-                
-                for (let j = 1; j < points.length; j++) {
-                    ctx.lineTo(points[j].x, points[j].y);
-                }
-                
-                ctx.closePath();
-                
-                // 动态颜色，响应音频
-                const hueShift = audioBass * 30 + audioMid * 15;
-                const waveHue = (hue + i * 4 + hueShift) % 360;
-                const lightness = 50 + i * 2 + audioAverage * 20;
-                const saturation = config.saturation + audioBass * 20;
-                
-                ctx.strokeStyle = `hsla(${waveHue}, ${Math.min(saturation, 100)}%, ${lightness}%, ${alpha})`;
-                ctx.lineWidth = 3 + (1 - waveProgress) * 5 + audioBass * 3;
-                ctx.stroke();
-                
-                // 填充发光效果
-                if (i < 5) {
-                    const innerRadius = Math.max(0, baseRadius - 15);
-                    const outerRadius = Math.max(innerRadius + 1, baseRadius + 60);
-                    const gradient = ctx.createRadialGradient(
-                        center.x, center.y, innerRadius,
-                        center.x, center.y, outerRadius
-                    );
-                    gradient.addColorStop(0, `hsla(${waveHue}, ${saturation}%, 60%, 0)`);
-                    gradient.addColorStop(0.3, `hsla(${waveHue}, ${saturation}%, 55%, ${alpha * 0.4})`);
-                    gradient.addColorStop(0.7, `hsla(${waveHue}, ${saturation}%, 50%, ${alpha * 0.2})`);
-                    gradient.addColorStop(1, `hsla(${waveHue}, ${saturation}%, 45%, 0)`);
-                    
-                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(flowerX, flowerY, centerSize, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${centerHue}, 90%, 60%, ${alpha})`;
                     ctx.fill();
+                    
+                    const spiralCount = 2;
+                    for (let s = 0; s < spiralCount; s++) {
+                        ctx.beginPath();
+                        const spiralOffset = s * (Math.PI / spiralCount);
+                        
+                        for (let t = 0; t <= 1; t += 0.02) {
+                            const spiralAngle = t * Math.PI * 8 + spiralOffset + time * 0.02;
+                            const spiralRadius = t * maxRadius * 0.9 * (1 + audioAverage * 0.3);
+                            
+                            const x = centerX + Math.cos(spiralAngle) * spiralRadius;
+                            const y = centerY + Math.sin(spiralAngle) * spiralRadius;
+                            
+                            if (t === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        
+                        const spiralHue = (s * 180 + time * 0.5) % 360;
+                        ctx.strokeStyle = `hsla(${spiralHue}, 80%, 60%, ${0.3 + beatIntensity * 0.2})`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
                 }
             }
             
-            // 绘制中心发光点
-            const centerGlowRadius = Math.max(0, 8 + audioBass * 25 + beatIntensity * 15);
-            if (centerGlowRadius > 0) {
-                ctx.beginPath();
-                ctx.arc(center.x, center.y, centerGlowRadius, 0, Math.PI * 2);
-                const centerGlow = ctx.createRadialGradient(
-                    center.x, center.y, 0,
-                    center.x, center.y, Math.max(1, centerGlowRadius * 2)
-                );
-                centerGlow.addColorStop(0, `hsla(${hue}, ${config.saturation}%, 70%, ${0.9 + audioBass * 0.1})`);
-                centerGlow.addColorStop(0.3, `hsla(${hue}, ${config.saturation}%, 60%, ${0.5 + audioAverage * 0.2})`);
-                centerGlow.addColorStop(0.6, `hsla(${hue}, ${config.saturation}%, 50%, ${0.2 + beatIntensity * 0.3})`);
-                centerGlow.addColorStop(1, `hsla(${hue}, ${config.saturation}%, 50%, 0)`);
-                ctx.fillStyle = centerGlow;
-                ctx.fill();
-            }
+            const coreSize = 30 + audioBass * 40 + beatIntensity * 20;
+            const coreGlow = ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, coreSize * 2
+            );
+            coreGlow.addColorStop(0, `hsla(300, 100%, 70%, ${0.8 + audioBass * 0.2})`);
+            coreGlow.addColorStop(0.3, `hsla(280, 100%, 60%, ${0.5 + audioAverage * 0.2})`);
+            coreGlow.addColorStop(0.7, `hsla(260, 90%, 50%, ${0.2 + beatIntensity * 0.3})`);
+            coreGlow.addColorStop(1, `hsla(240, 80%, 40%, 0)`);
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, coreSize * 2, 0, Math.PI * 2);
+            ctx.fillStyle = coreGlow;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, coreSize, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(320, 100%, 80%, ${0.9 + beatIntensity * 0.1})`;
+            ctx.fill();
         }
 
         function drawWaves() {
@@ -702,8 +710,7 @@
             ctx.rect(0, 0, width, height);
             ctx.clip();
             
-            drawCircularWaves(leftCenter, config.leftHue, 0);
-            drawCircularWaves(rightCenter, config.rightHue, 100);
+            drawKaleidoscopeFlowers();
             
             ctx.restore();
         }
