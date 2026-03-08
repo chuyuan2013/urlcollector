@@ -583,125 +583,167 @@
             }
         }
 
-        function drawKaleidoscopeFlowers() {
+        const ionParticles = [];
+        const maxParticles = 200;
+        
+        function initIonParticles() {
+            for (let i = 0; i < maxParticles; i++) {
+                ionParticles.push({
+                    x: width / 2,
+                    y: height / 2,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: Math.random(),
+                    maxLife: 0.5 + Math.random() * 0.5,
+                    size: 1 + Math.random() * 3,
+                    hue: Math.random() * 60 + 180,
+                    trail: []
+                });
+            }
+        }
+        
+        function drawIonBeam() {
             const centerX = width / 2;
             const centerY = height / 2;
-            const maxRadius = Math.min(width, height) / 2 * 0.9;
             
             const totalResponse = (audioAverage + audioBass * 2 + audioMid * 0.5) / 3.5;
-            const musicMultiplier = 1 + totalResponse * 2;
-            const bassMultiplier = 1 + audioBass * 1.5;
-            const beatMultiplier = 1 + beatIntensity * 0.5;
+            const musicMultiplier = 1 + totalResponse * 3;
+            const bassMultiplier = 1 + audioBass * 2;
+            const beatMultiplier = 1 + beatIntensity * 1.5;
+            const speed = 3 * musicMultiplier * bassMultiplier;
             
-            const segments = 6;
-            const angleStep = (Math.PI * 2) / segments;
-            
-            for (let seg = 0; seg < segments; seg++) {
-                const baseAngle = seg * angleStep;
+            const beamCount = 8;
+            for (let b = 0; b < beamCount; b++) {
+                const baseAngle = (b / beamCount) * Math.PI * 2 + time * 0.005;
                 
-                for (let flower = 0; flower < 12; flower++) {
-                    const flowerProgress = flower / 12;
-                    const flowerDistance = maxRadius * flowerProgress * 0.9;
-                    const flowerSize = (15 + audioAverage * 20) * musicMultiplier * bassMultiplier * beatMultiplier;
-                    const petalCount = 5 + Math.floor(audioMid * 5);
+                for (let i = 0; i < ionParticles.length; i++) {
+                    const p = ionParticles[i];
                     
-                    const flowerAngle = baseAngle + time * 0.002 + flower * 0.5;
-                    const petalPhase = time * 0.01 + flower * 0.2;
+                    const targetAngle = baseAngle + Math.sin(time * 0.02 + b) * 0.5;
+                    const distFromCenter = Math.sqrt(
+                        Math.pow(p.x - centerX, 2) + 
+                        Math.pow(p.y - centerY, 2)
+                    );
+                    const maxDist = Math.min(width, height) * 0.45;
                     
-                    const flowerX = centerX + Math.cos(flowerAngle) * flowerDistance;
-                    const flowerY = centerY + Math.sin(flowerAngle) * flowerDistance;
+                    if (distFromCenter < 50) {
+                        p.vx += Math.cos(targetAngle) * 0.3 * bassMultiplier;
+                        p.vy += Math.sin(targetAngle) * 0.3 * bassMultiplier;
+                    } else if (distFromCenter > maxDist) {
+                        const pullStrength = 0.2 * musicMultiplier;
+                        p.vx -= (p.x - centerX) / distFromCenter * pullStrength;
+                        p.vy -= (p.y - centerY) / distFromCenter * pullStrength;
+                    }
                     
-                    const alpha = (0.7 + beatIntensity * 0.2) * (1 - flowerProgress * 0.7);
+                    const noiseAngle = time * 0.03 + i * 0.1;
+                    p.vx += Math.cos(noiseAngle) * 0.1 * audioMid;
+                    p.vy += Math.sin(noiseAngle) * 0.1 * audioMid;
                     
-                    for (let petal = 0; petal < petalCount; petal++) {
-                        const petalAngle = (petal / petalCount) * Math.PI * 2;
-                        const petalCurve = Math.sin(petalPhase + petal * 0.5) * flowerSize * 0.3;
-                        
+                    p.vx *= 0.98;
+                    p.vy *= 0.98;
+                    
+                    p.trail.push({ x: p.x, y: p.y });
+                    if (p.trail.length > 15) {
+                        p.trail.shift();
+                    }
+                    
+                    p.x += p.vx * speed;
+                    p.y += p.vy * speed;
+                    
+                    p.life -= 0.005;
+                    
+                    if (p.life <= 0 || p.x < 0 || p.x > width || p.y < 0 || p.y > height) {
+                        const spawnAngle = baseAngle + Math.random() * 0.5 - 0.25;
+                        const spawnDist = Math.random() * 30;
+                        p.x = centerX + Math.cos(spawnAngle) * spawnDist;
+                        p.y = centerY + Math.sin(spawnAngle) * spawnDist;
+                        p.vx = Math.cos(spawnAngle) * 2 * bassMultiplier;
+                        p.vy = Math.sin(spawnAngle) * 2 * bassMultiplier;
+                        p.life = p.maxLife;
+                        p.trail = [];
+                        p.hue = 180 + Math.random() * 60 + audioBass * 30;
+                    }
+                    
+                    const lifeRatio = p.life / p.maxLife;
+                    const fadeIn = Math.min(1, (1 - lifeRatio) * 5);
+                    const fadeOut = Math.min(1, lifeRatio * 3);
+                    const alpha = fadeIn * fadeOut * (0.5 + beatIntensity * 0.3);
+                    
+                    if (p.trail.length > 1) {
                         ctx.beginPath();
+                        ctx.moveTo(p.trail[0].x, p.trail[0].y);
                         
-                        for (let i = 0; i <= 30; i++) {
-                            const t = i / 30;
-                            const curveAngle = petalAngle + Math.sin(t * Math.PI) * 0.5;
-                            const curveRadius = Math.sin(t * Math.PI) * (flowerSize + petalCurve);
-                            
-                            const x = flowerX + Math.cos(curveAngle) * curveRadius;
-                            const y = flowerY + Math.sin(curveAngle) * curveRadius;
-                            
-                            if (i === 0) {
-                                ctx.moveTo(x, y);
-                            } else {
-                                ctx.lineTo(x, y);
-                            }
+                        for (let t = 1; t < p.trail.length; t++) {
+                            ctx.lineTo(p.trail[t].x, p.trail[t].y);
                         }
+                        ctx.lineTo(p.x, p.y);
                         
-                        ctx.closePath();
+                        const trailGradient = ctx.createLinearGradient(
+                            p.trail[0].x, p.trail[0].y,
+                            p.x, p.y
+                        );
+                        const particleHue = p.hue + time * 0.5;
+                        trailGradient.addColorStop(0, `hsla(${particleHue}, 100%, 50%, 0)`);
+                        trailGradient.addColorStop(1, `hsla(${particleHue}, 100%, 60%, ${alpha * 0.6})`);
                         
-                        const hue = (seg * 60 + flower * 15 + audioBass * 30) % 360;
-                        const saturation = 80 + audioBass * 20;
-                        const lightness = 50 + audioAverage * 20;
-                        
-                        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha * 0.6})`;
-                        ctx.fill();
-                        
-                        ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness + 10}%, ${alpha})`;
-                        ctx.lineWidth = 1 + (1 - flowerProgress) * 2;
+                        ctx.strokeStyle = trailGradient;
+                        ctx.lineWidth = p.size * (0.5 + lifeRatio * 0.5);
+                        ctx.lineCap = 'round';
                         ctx.stroke();
                     }
                     
-                    const centerHue = (seg * 60 + flower * 15 + 60) % 360;
-                    const centerSize = flowerSize * 0.25 * (1 + beatIntensity * 0.3);
-                    
+                    const particleSize = p.size * (1 + audioAverage * 2) * (1 + beatIntensity);
                     ctx.beginPath();
-                    ctx.arc(flowerX, flowerY, centerSize, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsla(${centerHue}, 90%, 60%, ${alpha})`;
-                    ctx.fill();
+                    ctx.arc(p.x, p.y, particleSize, 0, Math.PI * 2);
                     
-                    const spiralCount = 2;
-                    for (let s = 0; s < spiralCount; s++) {
-                        ctx.beginPath();
-                        const spiralOffset = s * (Math.PI / spiralCount);
-                        
-                        for (let t = 0; t <= 1; t += 0.02) {
-                            const spiralAngle = t * Math.PI * 8 + spiralOffset + time * 0.02;
-                            const spiralRadius = t * maxRadius * 0.9 * (1 + audioAverage * 0.3);
-                            
-                            const x = centerX + Math.cos(spiralAngle) * spiralRadius;
-                            const y = centerY + Math.sin(spiralAngle) * spiralRadius;
-                            
-                            if (t === 0) {
-                                ctx.moveTo(x, y);
-                            } else {
-                                ctx.lineTo(x, y);
-                            }
-                        }
-                        
-                        const spiralHue = (s * 180 + time * 0.5) % 360;
-                        ctx.strokeStyle = `hsla(${spiralHue}, 80%, 60%, ${0.3 + beatIntensity * 0.2})`;
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-                    }
+                    const particleGradient = ctx.createRadialGradient(
+                        p.x, p.y, 0,
+                        p.x, p.y, particleSize * 2
+                    );
+                    const coreHue = p.hue + 20 + time * 0.3;
+                    particleGradient.addColorStop(0, `hsla(${coreHue}, 100%, 90%, ${alpha})`);
+                    particleGradient.addColorStop(0.3, `hsla(${coreHue}, 100%, 70%, ${alpha * 0.8})`);
+                    particleGradient.addColorStop(1, `hsla(${coreHue}, 100%, 50%, 0)`);
+                    
+                    ctx.fillStyle = particleGradient;
+                    ctx.fill();
                 }
             }
             
-            const coreSize = 30 + audioBass * 40 + beatIntensity * 20;
+            const corePulse = 20 + audioBass * 30 + beatIntensity * 15;
             const coreGlow = ctx.createRadialGradient(
                 centerX, centerY, 0,
-                centerX, centerY, coreSize * 2
+                centerX, centerY, corePulse * 3
             );
-            coreGlow.addColorStop(0, `hsla(300, 100%, 70%, ${0.8 + audioBass * 0.2})`);
-            coreGlow.addColorStop(0.3, `hsla(280, 100%, 60%, ${0.5 + audioAverage * 0.2})`);
-            coreGlow.addColorStop(0.7, `hsla(260, 90%, 50%, ${0.2 + beatIntensity * 0.3})`);
-            coreGlow.addColorStop(1, `hsla(240, 80%, 40%, 0)`);
+            coreGlow.addColorStop(0, `hsla(200, 100%, 80%, ${0.9 + audioBass * 0.1})`);
+            coreGlow.addColorStop(0.2, `hsla(220, 100%, 60%, ${0.6 + audioAverage * 0.2})`);
+            coreGlow.addColorStop(0.5, `hsla(240, 100%, 50%, ${0.3 + beatIntensity * 0.2})`);
+            coreGlow.addColorStop(1, `hsla(260, 100%, 40%, 0)`);
             
             ctx.beginPath();
-            ctx.arc(centerX, centerY, coreSize * 2, 0, Math.PI * 2);
+            ctx.arc(centerX, centerY, corePulse * 3, 0, Math.PI * 2);
             ctx.fillStyle = coreGlow;
             ctx.fill();
             
             ctx.beginPath();
-            ctx.arc(centerX, centerY, coreSize, 0, Math.PI * 2);
-            ctx.fillStyle = `hsla(320, 100%, 80%, ${0.9 + beatIntensity * 0.1})`;
+            ctx.arc(centerX, centerY, corePulse, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(180, 100%, 90%, ${0.95})`;
             ctx.fill();
+            
+            for (let ring = 0; ring < 3; ring++) {
+                const ringRadius = 60 + ring * 40 + Math.sin(time * 0.05 + ring) * 10 * musicMultiplier;
+                const ringAlpha = (0.3 - ring * 0.08) * (1 + beatIntensity * 0.5);
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `hsla(${200 + ring * 20 + time * 0.5}, 100%, 60%, ${ringAlpha})`;
+                ctx.lineWidth = 2 + audioBass * 2;
+                ctx.stroke();
+            }
+        }
+        
+        function drawKaleidoscopeFlowers() {
+            drawIonBeam();
         }
 
         function drawWaves() {
@@ -1122,6 +1164,7 @@
         console.log('🌊 音浪播放器启动中...');
         updateDebug(`<div>状态: 等待上传</div><div>音频上下文: 未初始化</div><div>音量: 70%</div>`);
         resize();
+        initIonParticles();
         animate();
     </script>
 </body>
